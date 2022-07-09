@@ -29,11 +29,9 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
     int guessesNeeded = 0;
     std::unordered_set<int> possibilities;
     stack<std::pair<int, int>> guesses;
-    //stack<std::pair<std::pair<int, int>, std::unordered_set<int>>> impossible;
     unordered_map<std::pair<int, int>, std::unordered_set<int>, hash_pair> impossible;
     bool loopRow = true;
     bool loopCol = true;
-    //Tried* currTry = nullptr;
     //O(279)
     for (int i = 0; i < 9; i++) {
         for (int j = 0; j < 9; j++) {
@@ -41,14 +39,9 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
                 guessesNeeded++;
         }
     }
-
     while (loopRow) {
-        //for (int i = randI; i < randI + 9; i++) {
-            //int indexI = (i % 9);
             //O(81)
         while (loopCol) {
-            //for (int j = randJ; j < randJ + 9; j++) {
-                //int indexJ = (j % 9);
             if ((*puzzle)[indexI][indexJ] != -1) {
                 indexJ = (indexJ + 1) % 9;
                 if (indexJ == randJ)
@@ -76,19 +69,6 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
                 }
 
             }
-            /*
-            for (auto it = alreadyTried[std::make_pair(indexI, indexJ)].begin(); it != alreadyTried[std::make_pair(indexI, indexJ)].end(); it++) {
-                if (it->second == true)
-                    possibilities.erase(it->first);
-
-            }
-            */
-            /*
-            if (currTry) {
-                for (auto it = currTry->impossible.begin(); it != currTry->impossible.end(); it++)
-                    possibilities.erase(it->first);
-            }
-            */
             if (impossible.count(std::make_pair(indexI, indexJ))) {
                 for (auto it = impossible[std::make_pair(indexI, indexJ)].begin(); it != impossible[std::make_pair(indexI, indexJ)].end(); it++) {
                     possibilities.erase(*it);
@@ -101,13 +81,6 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
             if (possibilities.size() == 0) {
                 if (guesses.size() == 0)
                     return -1;
-                //alreadyTried[guesses.top()][(*puzzle)[indexI][indexJ]] = true;
-                /*
-                currTry->root->impossible[(*puzzle)[guesses.top().first][guesses.top().second]] = true;
-                Tried* tempTry = currTry->root;
-                delete currTry;
-                currTry = tempTry;
-                */
                 impossible[guesses.top()].insert((*puzzle)[guesses.top().first][guesses.top().second]);
                 //make it so that it deletes this set, not just clears it (looks cleaner when debugging)
                 if(impossible.count(std::make_pair(indexI, indexJ)))
@@ -125,26 +98,180 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
                 randomElement++;
             (*puzzle)[indexI][indexJ] = *randomElement;
             guesses.push(std::make_pair(indexI, indexJ));
-            //currTry = new Tried(currTry);
 
             //now, next iteration.
-
             indexJ = (indexJ + 1) % 9;
             if (indexJ == randJ)
                 break;
         }
         indexI = (indexI + 1) % 9;
-        if (guesses.size() == guessesNeeded) {
-            /*
-            while (currTry != nullptr) {
-                Tried* tempTryPtr = currTry->root;
-                delete tempTryPtr;
-                currTry = tempTryPtr;
+        //clean up
+        if (guesses.size() == guessesNeeded) {            
+            return 1;
+
+        }
+    }
+    return 1;
+}
+int improvedSolvePuzzle(vector<vector<int>>* puzzle) {
+    srand(time(NULL));
+    int randI = rand() % 9;
+    int randJ = rand() % 9;
+    int indexI = randI;
+    int indexJ = randJ;
+    int guessesNeeded = 0;
+    std::unordered_set<int> possibilities;
+    stack<std::pair<int, int>> guesses;
+    unordered_map<std::pair<int, int>, std::unordered_set<int>, hash_pair> impossible;
+    bool loopRow = true;
+    bool loopCol = true;
+    bool preScan = true;
+    int resetCounter = 81;
+    std::pair<int, int> start = std::make_pair(0, 0);
+    int lowestPossibilities = 10;
+    //O(279)
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            if ((*puzzle)[i][j] == -1)
+                guessesNeeded++;
+        }
+    }
+    while (preScan) {
+        //O(81)
+        while (loopCol) {
+            if ((*puzzle)[indexI][indexJ] != -1) {
+                indexJ = (indexJ + 1) % 9;
+                resetCounter--;
+                if (indexJ == randJ)
+                    break;
+                continue;
             }
-            */
-            for (auto it = impossible.begin(); it != impossible.end(); it++) {
+            for (int i = 0; i < 9; i++)
+                possibilities.insert(i + 1);
+            //O(9)
+            //eliminates possible #s which share a row or column.
+            for (int k = 0; k < 9; k++) {
+                if ((*puzzle)[indexI][k] != -1)
+                    possibilities.erase((*puzzle)[indexI][k]);
+                if ((*puzzle)[k][indexJ] != -1)
+                    possibilities.erase((*puzzle)[k][indexJ]);
+            }
+            //O(9)
+            //eliminates possible #s which share a group.
+            for (int l = indexI; l < indexI + 3; l++) {
+                int indexL = (indexI / 3) * 3 + (l % 3);
+                for (int m = indexJ; m < indexJ + 3; m++) {
+                    int indexM = (indexJ / 3) * 3 + (m % 3);
+                    if ((*puzzle)[indexL][indexM] != -1)
+                        possibilities.erase((*puzzle)[indexL][indexM]);
+                }
 
             }
+            //if possibilities is empty, backtrack. (pop stack and set indexI, indexJ to proper values associated with the stack. Also reset value of space.)
+            //PROBLEM!!! when I back-track, I put my current guess as "already tried" but that guess may actually be CORRECT (it was a previous guess that did me in.) So, I need to figure out how to 
+            //only "already tried" the problematic guess. Might need to use a tree of already-trieds (which would be straight cancer, especially when run on an empty board). Perhaps make a tree of guesses
+            //in which 
+            if (possibilities.size() == 0) {
+                return -1;
+            }
+            if (possibilities.size() == 1) {
+                (*puzzle)[indexI][indexJ] = *possibilities.begin();
+                if (indexI == start.first && indexJ == start.second) {
+                    lowestPossibilities = 10;
+                }
+                guessesNeeded--;
+                resetCounter = 81;
+            }
+            if (possibilities.size() > 1 && (possibilities.size() < lowestPossibilities)) {
+                start.first = indexI;
+                start.second = indexJ;
+            }
+            if(resetCounter < 0) {
+                preScan = false;
+                break;
+            }
+            //now, next iteration.
+            indexJ = (indexJ + 1) % 9;
+            resetCounter--;
+            if (indexJ == randJ)
+                break;
+        }
+        indexI = (indexI + 1) % 9;
+        //clean up
+        if (guessesNeeded == 0) {
+            return 1;
+        }
+    }
+    indexI = start.first;
+    indexJ = start.second;
+    while (loopRow) {
+        //O(81)
+        while (loopCol) {
+            if ((*puzzle)[indexI][indexJ] != -1) {
+                indexJ = (indexJ + 1) % 9;
+                if (indexJ == start.second)
+                    break;
+                continue;
+            }
+            for (int i = 0; i < 9; i++)
+                possibilities.insert(i + 1);
+            //O(9)
+            //eliminates possible #s which share a row or column.
+            for (int k = 0; k < 9; k++) {
+                if ((*puzzle)[indexI][k] != -1)
+                    possibilities.erase((*puzzle)[indexI][k]);
+                if ((*puzzle)[k][indexJ] != -1)
+                    possibilities.erase((*puzzle)[k][indexJ]);
+            }
+            //O(9)
+            //eliminates possible #s which share a group.
+            for (int l = indexI; l < indexI + 3; l++) {
+                int indexL = (indexI / 3) * 3 + (l % 3);
+                for (int m = indexJ; m < indexJ + 3; m++) {
+                    int indexM = (indexJ / 3) * 3 + (m % 3);
+                    if ((*puzzle)[indexL][indexM] != -1)
+                        possibilities.erase((*puzzle)[indexL][indexM]);
+                }
+
+            }
+            if (impossible.count(std::make_pair(indexI, indexJ))) {
+                for (auto it = impossible[std::make_pair(indexI, indexJ)].begin(); it != impossible[std::make_pair(indexI, indexJ)].end(); it++) {
+                    possibilities.erase(*it);
+                }
+            }
+            //if possibilities is empty, backtrack. (pop stack and set indexI, indexJ to proper values associated with the stack. Also reset value of space.)
+            //PROBLEM!!! when I back-track, I put my current guess as "already tried" but that guess may actually be CORRECT (it was a previous guess that did me in.) So, I need to figure out how to 
+            //only "already tried" the problematic guess. Might need to use a tree of already-trieds (which would be straight cancer, especially when run on an empty board). Perhaps make a tree of guesses
+            //in which 
+            if (possibilities.size() == 0) {
+                if (guesses.size() == 0)
+                    return -1;
+                impossible[guesses.top()].insert((*puzzle)[guesses.top().first][guesses.top().second]);
+                //make it so that it deletes this set, not just clears it (looks cleaner when debugging)
+                if (impossible.count(std::make_pair(indexI, indexJ)))
+                    impossible[std::make_pair(indexI, indexJ)].clear();
+                (*puzzle)[guesses.top().first][guesses.top().second] = -1;
+                indexI = guesses.top().first;
+                indexJ = guesses.top().second;
+                guesses.pop();
+                continue;
+            }
+
+            //now, try random possibility. Record in stack.
+            auto randomElement = possibilities.begin();
+            for (int i = 0; i < (rand() % possibilities.size()); i++)
+                randomElement++;
+            (*puzzle)[indexI][indexJ] = *randomElement;
+            guesses.push(std::make_pair(indexI, indexJ));
+
+            //now, next iteration.
+            indexJ = (indexJ + 1) % 9;
+            if (indexJ == start.second)
+                break;
+        }
+        indexI = (indexI + 1) % 9;
+        //clean up
+        if (guesses.size() == guessesNeeded) {
             return 1;
 
         }
@@ -172,6 +299,284 @@ void drawBoard(sf::RenderWindow* window, std::vector<sf::Sprite*>* sprites, std:
         }
     }
 };
+int improvedSolvePuzzleInSteps(vector<vector<int>>* puzzle, sf::RenderWindow* window, std::vector<sf::Sprite*>* sprites) {
+    srand(time(NULL));
+    int randI = rand() % 9;
+    int randJ = rand() % 9;
+    int indexI = randI;
+    int indexJ = randJ;
+    int guessesNeeded = 0;
+    std::unordered_set<int> possibilities;
+    stack<std::pair<int, int>> guesses;
+    unordered_map<std::pair<int, int>, std::unordered_set<int>, hash_pair> impossible;
+    bool loopRow = true;
+    bool loopCol = true;
+    bool preScan = true;
+    int resetCounter = 81;
+    std::pair<int, int> start = std::make_pair(0, 0);
+    int lowestPossibilities = 10;
+    int display = 0;
+    //O(279)
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            if ((*puzzle)[i][j] == -1)
+                guessesNeeded++;
+        }
+    }
+    while (preScan) {
+        //O(81)
+        while (loopCol) {
+            if ((*puzzle)[indexI][indexJ] != -1) {
+                indexJ = (indexJ + 1) % 9;
+                resetCounter--;
+                if (indexJ == randJ)
+                    break;
+                continue;
+            }
+            for (int i = 0; i < 9; i++)
+                possibilities.insert(i + 1);
+            //O(9)
+            //eliminates possible #s which share a row or column.
+            for (int k = 0; k < 9; k++) {
+                if ((*puzzle)[indexI][k] != -1)
+                    possibilities.erase((*puzzle)[indexI][k]);
+                if ((*puzzle)[k][indexJ] != -1)
+                    possibilities.erase((*puzzle)[k][indexJ]);
+            }
+            //O(9)
+            //eliminates possible #s which share a group.
+            for (int l = indexI; l < indexI + 3; l++) {
+                int indexL = (indexI / 3) * 3 + (l % 3);
+                for (int m = indexJ; m < indexJ + 3; m++) {
+                    int indexM = (indexJ / 3) * 3 + (m % 3);
+                    if ((*puzzle)[indexL][indexM] != -1)
+                        possibilities.erase((*puzzle)[indexL][indexM]);
+                }
+
+            }
+            //if possibilities is empty, backtrack. (pop stack and set indexI, indexJ to proper values associated with the stack. Also reset value of space.)
+            //PROBLEM!!! when I back-track, I put my current guess as "already tried" but that guess may actually be CORRECT (it was a previous guess that did me in.) So, I need to figure out how to 
+            //only "already tried" the problematic guess. Might need to use a tree of already-trieds (which would be straight cancer, especially when run on an empty board). Perhaps make a tree of guesses
+            //in which 
+            if (possibilities.size() == 0) {
+                return -1;
+            }
+            if (possibilities.size() == 1) {
+                (*puzzle)[indexI][indexJ] = *possibilities.begin();
+                if (indexI == start.first && indexJ == start.second) {
+                    lowestPossibilities = 10;
+                }
+                guessesNeeded--;
+                resetCounter = 81;
+                drawBoard(window, sprites, puzzle);
+                window->display();
+            }
+            if (possibilities.size() > 1 && (possibilities.size() < lowestPossibilities)) {
+                start.first = indexI;
+                start.second = indexJ;
+            }
+            if (resetCounter < 0) {
+                preScan = false;
+                break;
+            }
+            //now, next iteration.
+            indexJ = (indexJ + 1) % 9;
+            resetCounter--;
+            if (indexJ == randJ)
+                break;
+        }
+        indexI = (indexI + 1) % 9;
+        //clean up
+        if (guessesNeeded == 0) {
+            return 1;
+        }
+    }
+    indexI = start.first;
+    indexJ = start.second;
+    while (loopRow) {
+        //O(81)
+        while (loopCol) {
+            if ((*puzzle)[indexI][indexJ] != -1) {
+                indexJ = (indexJ + 1) % 9;
+                if (indexJ == start.second)
+                    break;
+                continue;
+            }
+            for (int i = 0; i < 9; i++)
+                possibilities.insert(i + 1);
+            //O(9)
+            //eliminates possible #s which share a row or column.
+            for (int k = 0; k < 9; k++) {
+                if ((*puzzle)[indexI][k] != -1)
+                    possibilities.erase((*puzzle)[indexI][k]);
+                if ((*puzzle)[k][indexJ] != -1)
+                    possibilities.erase((*puzzle)[k][indexJ]);
+            }
+            //O(9)
+            //eliminates possible #s which share a group.
+            for (int l = indexI; l < indexI + 3; l++) {
+                int indexL = (indexI / 3) * 3 + (l % 3);
+                for (int m = indexJ; m < indexJ + 3; m++) {
+                    int indexM = (indexJ / 3) * 3 + (m % 3);
+                    if ((*puzzle)[indexL][indexM] != -1)
+                        possibilities.erase((*puzzle)[indexL][indexM]);
+                }
+
+            }
+            if (impossible.count(std::make_pair(indexI, indexJ))) {
+                for (auto it = impossible[std::make_pair(indexI, indexJ)].begin(); it != impossible[std::make_pair(indexI, indexJ)].end(); it++) {
+                    possibilities.erase(*it);
+                }
+            }
+            //if possibilities is empty, backtrack. (pop stack and set indexI, indexJ to proper values associated with the stack. Also reset value of space.)
+            //PROBLEM!!! when I back-track, I put my current guess as "already tried" but that guess may actually be CORRECT (it was a previous guess that did me in.) So, I need to figure out how to 
+            //only "already tried" the problematic guess. Might need to use a tree of already-trieds (which would be straight cancer, especially when run on an empty board). Perhaps make a tree of guesses
+            //in which 
+            if (possibilities.size() == 0) {
+                if (guesses.size() == 0)
+                    return -1;
+                impossible[guesses.top()].insert((*puzzle)[guesses.top().first][guesses.top().second]);
+                //make it so that it deletes this set, not just clears it (looks cleaner when debugging)
+                if (impossible.count(std::make_pair(indexI, indexJ)))
+                    impossible[std::make_pair(indexI, indexJ)].clear();
+                (*puzzle)[guesses.top().first][guesses.top().second] = -1;
+                indexI = guesses.top().first;
+                indexJ = guesses.top().second;
+                guesses.pop();
+                continue;
+            }
+
+            //now, try random possibility. Record in stack.
+            auto randomElement = possibilities.begin();
+            for (int i = 0; i < (rand() % possibilities.size()); i++)
+                randomElement++;
+            (*puzzle)[indexI][indexJ] = *randomElement;
+            guesses.push(std::make_pair(indexI, indexJ));
+
+            //draw & display
+            if (display++ == 50) {
+                drawBoard(window, sprites, puzzle);
+                window->display();
+                display = 0;
+            }
+
+            //now, next iteration.
+            indexJ = (indexJ + 1) % 9;
+            if (indexJ == start.second)
+                break;
+        }
+        indexI = (indexI + 1) % 9;
+        //clean up
+        if (guesses.size() == guessesNeeded) {
+            return 1;
+
+        }
+    }
+    return 1;
+}
+int solvePuzzleInSteps(vector<vector<int>>* puzzle, sf::RenderWindow* window, std::vector<sf::Sprite*>* sprites) {
+    srand(time(NULL));
+    int randI = rand() % 9;
+    int randJ = rand() % 9;
+    int indexI = randI;
+    int indexJ = randJ;
+    int guessesNeeded = 0;
+    std::unordered_set<int> possibilities;
+    stack<std::pair<int, int>> guesses;
+    unordered_map<std::pair<int, int>, std::unordered_set<int>, hash_pair> impossible;
+    bool loopRow = true;
+    bool loopCol = true;
+    int display = 0;
+    //O(279)
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            if ((*puzzle)[i][j] == -1)
+                guessesNeeded++;
+        }
+    }
+    while (loopRow) {
+        //O(81)
+        while (loopCol) {
+            if ((*puzzle)[indexI][indexJ] != -1) {
+                indexJ = (indexJ + 1) % 9;
+                if (indexJ == randJ)
+                    break;
+                continue;
+            }
+            for (int i = 0; i < 9; i++)
+                possibilities.insert(i + 1);
+            //O(9)
+            //eliminates possible #s which share a row or column.
+            for (int k = 0; k < 9; k++) {
+                if ((*puzzle)[indexI][k] != -1)
+                    possibilities.erase((*puzzle)[indexI][k]);
+                if ((*puzzle)[k][indexJ] != -1)
+                    possibilities.erase((*puzzle)[k][indexJ]);
+            }
+            //O(9)
+            //eliminates possible #s which share a group.
+            for (int l = indexI; l < indexI + 3; l++) {
+                int indexL = (indexI / 3) * 3 + (l % 3);
+                for (int m = indexJ; m < indexJ + 3; m++) {
+                    int indexM = (indexJ / 3) * 3 + (m % 3);
+                    if ((*puzzle)[indexL][indexM] != -1)
+                        possibilities.erase((*puzzle)[indexL][indexM]);
+                }
+
+            }
+            if (impossible.count(std::make_pair(indexI, indexJ))) {
+                for (auto it = impossible[std::make_pair(indexI, indexJ)].begin(); it != impossible[std::make_pair(indexI, indexJ)].end(); it++) {
+                    possibilities.erase(*it);
+                }
+            }
+            //if possibilities is empty, backtrack. (pop stack and set indexI, indexJ to proper values associated with the stack. Also reset value of space.)
+            //PROBLEM!!! when I back-track, I put my current guess as "already tried" but that guess may actually be CORRECT (it was a previous guess that did me in.) So, I need to figure out how to 
+            //only "already tried" the problematic guess. Might need to use a tree of already-trieds (which would be straight cancer, especially when run on an empty board). Perhaps make a tree of guesses
+            //in which 
+            if (possibilities.size() == 0) {
+                if (guesses.size() == 0)
+                    return -1;
+                impossible[guesses.top()].insert((*puzzle)[guesses.top().first][guesses.top().second]);
+                //make it so that it deletes this set, not just clears it (looks cleaner when debugging)
+                if (impossible.count(std::make_pair(indexI, indexJ)))
+                    impossible[std::make_pair(indexI, indexJ)].clear();
+                (*puzzle)[guesses.top().first][guesses.top().second] = -1;
+                indexI = guesses.top().first;
+                indexJ = guesses.top().second;
+                guesses.pop();
+                continue;
+            }
+
+            //now, try random possibility. Record in stack.
+            auto randomElement = possibilities.begin();
+            for (int i = 0; i < (rand() % possibilities.size()); i++)
+                randomElement++;
+            (*puzzle)[indexI][indexJ] = *randomElement;
+            guesses.push(std::make_pair(indexI, indexJ));
+            if (display++ == 180) {
+                display = 0;
+                drawBoard(window, sprites, puzzle);
+                window->display();
+            }
+            
+
+            //now, next iteration.
+            indexJ = (indexJ + 1) % 9;
+            if (indexJ == randJ) {
+                //drawBoard(window, sprites, puzzle);
+                //window->display();
+                break;
+            }
+        }
+        indexI = (indexI + 1) % 9;
+        //clean up
+        if (guesses.size() == guessesNeeded) {
+            return 1;
+
+        }
+    }
+    return 1;
+}
 
 int main()
 {
@@ -222,6 +627,7 @@ int main()
 
     std::vector<std::vector<int>> numbers;
     std::string example = "030000400000043602050001000060000074070000030509000000007009360100206090000070000";
+    std::string example1 = "700009040000000305050001700000000000400008060002010070040020036500030000800060010";
 
     for (int i = 0; i < 9; i++){
         std::vector<int> ones(9, i+1);
@@ -236,13 +642,15 @@ int main()
     */
     int i = 0;
     for (int j = 0; j < 81; j++) {
-        numbers[i][j / 9] = example[j] - 48;
+        numbers[i][j / 9] = example1[j] - 48;
         if (numbers[i][j / 9] == 0)
             numbers[i][j / 9] = -1;
         i = (i + 1) % 9;
     }
-    
-    if (solvePuzzle(&numbers) == -1) std::cout << "error in solve puzzle" << std::endl;
+    //if (solvePuzzle(&numbers) == -1) std::cout << "error in solve puzzle" << std::endl;
+    //if (improvedSolvePuzzle(&numbers) == -1) std::cout << "error in solve puzzle" << std::endl;
+    //if (solvePuzzleInSteps(&numbers, &window, &sprites) == -1) std::cout << "error in solve puzzle" << std::endl;
+    if (improvedSolvePuzzleInSteps(&numbers, &window, &sprites) == -1) std::cout << "error in solve puzzle" << std::endl;
     
     bool exit = false;
     while (window.isOpen())
