@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <iostream>
 #include "Tried.cpp"
+#include <unordered_set>
 using std::unordered_map;
 using std::vector;
 using std::stack;
@@ -26,12 +27,13 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
     int indexI = randI;
     int indexJ = randJ;
     int guessesNeeded = 0;
-    unordered_map<int, bool> possibilities;
+    std::unordered_set<int> possibilities;
     stack<std::pair<int, int>> guesses;
-    unordered_map<std::pair<int, int>, unordered_map<int, bool>, hash_pair> alreadyTried;
+    //stack<std::pair<std::pair<int, int>, std::unordered_set<int>>> impossible;
+    unordered_map<std::pair<int, int>, std::unordered_set<int>, hash_pair> impossible;
     bool loopRow = true;
     bool loopCol = true;
-    Tried* currTry = nullptr;
+    //Tried* currTry = nullptr;
     //O(279)
     for (int i = 0; i < 9; i++) {
         for (int j = 0; j < 9; j++) {
@@ -54,7 +56,7 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
                 continue;
             }
             for (int i = 0; i < 9; i++)
-                possibilities[i + 1] = true;
+                possibilities.insert(i + 1);
             //O(9)
             //eliminates possible #s which share a row or column.
             for (int k = 0; k < 9; k++) {
@@ -81,9 +83,16 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
 
             }
             */
+            /*
             if (currTry) {
                 for (auto it = currTry->impossible.begin(); it != currTry->impossible.end(); it++)
                     possibilities.erase(it->first);
+            }
+            */
+            if (impossible.count(std::make_pair(indexI, indexJ))) {
+                for (auto it = impossible[std::make_pair(indexI, indexJ)].begin(); it != impossible[std::make_pair(indexI, indexJ)].end(); it++) {
+                    possibilities.erase(*it);
+                }
             }
             //if possibilities is empty, backtrack. (pop stack and set indexI, indexJ to proper values associated with the stack. Also reset value of space.)
             //PROBLEM!!! when I back-track, I put my current guess as "already tried" but that guess may actually be CORRECT (it was a previous guess that did me in.) So, I need to figure out how to 
@@ -93,10 +102,16 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
                 if (guesses.size() == 0)
                     return -1;
                 //alreadyTried[guesses.top()][(*puzzle)[indexI][indexJ]] = true;
+                /*
                 currTry->root->impossible[(*puzzle)[guesses.top().first][guesses.top().second]] = true;
                 Tried* tempTry = currTry->root;
                 delete currTry;
                 currTry = tempTry;
+                */
+                impossible[guesses.top()].insert((*puzzle)[guesses.top().first][guesses.top().second]);
+                //make it so that it deletes this set, not just clears it (looks cleaner when debugging)
+                if(impossible.count(std::make_pair(indexI, indexJ)))
+                    impossible[std::make_pair(indexI, indexJ)].clear();
                 (*puzzle)[guesses.top().first][guesses.top().second] = -1;
                 indexI = guesses.top().first;
                 indexJ = guesses.top().second;
@@ -105,12 +120,12 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
             }
 
             //now, try random possibility. Record in stack.
-             auto randomElement = possibilities.begin();
+            auto randomElement = possibilities.begin();
             for (int i = 0; i < (rand() % possibilities.size()); i++)
                 randomElement++;
-            (*puzzle)[indexI][indexJ] = randomElement->first;
+            (*puzzle)[indexI][indexJ] = *randomElement;
             guesses.push(std::make_pair(indexI, indexJ));
-            currTry = new Tried(currTry);
+            //currTry = new Tried(currTry);
 
             //now, next iteration.
 
@@ -120,10 +135,15 @@ int solvePuzzle(vector<vector<int>>* puzzle) {
         }
         indexI = (indexI + 1) % 9;
         if (guesses.size() == guessesNeeded) {
+            /*
             while (currTry != nullptr) {
                 Tried* tempTryPtr = currTry->root;
                 delete tempTryPtr;
                 currTry = tempTryPtr;
+            }
+            */
+            for (auto it = impossible.begin(); it != impossible.end(); it++) {
+
             }
             return 1;
 
@@ -222,7 +242,7 @@ int main()
         i = (i + 1) % 9;
     }
     
-    //if (solvePuzzle(&numbers) == -1) std::cout << "error in solve puzzle" << std::endl;
+    if (solvePuzzle(&numbers) == -1) std::cout << "error in solve puzzle" << std::endl;
     
     bool exit = false;
     while (window.isOpen())
